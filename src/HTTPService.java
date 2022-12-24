@@ -10,7 +10,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public class HTTPService {
-    public void request(String packetName) throws IOException, ParseException {
+    public LinkedList<String> getDependencies(String packetName) throws IOException, ParseException {
         LinkedList<String> dependencies = new LinkedList<>();
 
         URL url = new URL("https://pypi.org/pypi/" + packetName + "/json");
@@ -32,23 +32,43 @@ public class HTTPService {
         ZipInputStream zipInputStream = new ZipInputStream(streamFile);
         ZipEntry zipFileEntry;
 
-        while ((zipFileEntry = zipInputStream.getNextEntry()) != null){
-            if (zipFileEntry.getName().endsWith("METADATA")){
-                BufferedReader metadataFile = new BufferedReader(new InputStreamReader(zipInputStream));
-                String tempLine = metadataFile.readLine();
-
-                while (tempLine != null){
-                    if (tempLine.contains("Requires-Dist")){
-                        dependencies.add(tempLine.substring(15, tempLine.length()));
-                    }
-                    tempLine = metadataFile.readLine();
-                }
-                break;
+        BufferedReader metadataFile = new BufferedReader(new InputStreamReader(zipInputStream));
+        String tempLine = null;
+        while ((zipFileEntry = zipInputStream.getNextEntry()) != null) {
+            if (zipFileEntry.getName().endsWith("METADATA")) {
+                tempLine = metadataFile.readLine();
             }
         }
-        for (String dependency : dependencies) {
-            System.out.println(dependency);
-        }
+        while (tempLine != null){
+            if (tempLine.contains("Requires-Dist")){
+                String[] tempLineArray = tempLine.split(" ");
 
+                boolean deleteExtra = false;
+                for (String s : tempLineArray) {
+                    if (s.equals("extra")) {
+                        deleteExtra = true;
+                        break;
+                    }
+                }
+
+                if (!deleteExtra) dependencies.add(tempLineArray[1]);
+            }
+            tempLine = metadataFile.readLine();
+        }
+        return dependencies;
+    }
+
+    public void getDependenciesList(LinkedList<String> dependencies) throws IOException, ParseException {
+        for (String dependency : dependencies){
+            System.out.print("    " + dependency + "\n");
+            getDependencyTree(getDependencies(dependency));
+        }
+    }
+
+    public void getDependencyTree(LinkedList<String> dependencies) throws IOException, ParseException {
+        for (String dependency : dependencies) {
+            System.out.print(dependency + "\n");
+            getDependenciesList(getDependencies(dependency));
+        }
     }
 }
